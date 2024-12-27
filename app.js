@@ -17,7 +17,7 @@ const client = new line.Client(config);
 app.use(bodyParser.json());
 
 // Webhook 路徑
-app.post('/webhook', line.middleware(config), (req, res) => {
+app.post('/callback', line.middleware(config), (req, res) => {
     Promise.all(req.body.events.map(handleEvent))
       .then(() => res.status(200).end()) // 如果處理成功，返回 200
       .catch(err => {
