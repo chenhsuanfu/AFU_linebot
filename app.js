@@ -1,42 +1,45 @@
+// 引入必要的套件
+require('dotenv').config();  // 載入 .env 檔案中的環境變數
 const express = require('express');
 const line = require('@line/bot-sdk');
-const bodyParser = require('body-parser');
 
-const app = express();
-
-// LINE Bot 配置
+// 使用環境變數來讀取敏感資料
 const config = {
   channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.CHANNEL_SECRET,
+  channelSecret: process.env.CHANNEL_SECRET
 };
 
-// 初始化 LINE 客戶端
+const app = express();
+const port = process.env.PORT || 3000;
+
+// 初始化 LINE SDK 客戶端
 const client = new line.Client(config);
 
-// 使用 body-parser
-app.use(bodyParser.json());
+// 設定 webhook 路由
+app.post('/webhook', express.json(), (req, res) => {
+  const events = req.body.events;
 
-// Webhook 路徑
-app.post('/callback', line.middleware(config), (req, res) => {
-    Promise.all(req.body.events.map(handleEvent))
-      .then(() => res.status(200).end()) // 如果處理成功，返回 200
-      .catch(err => {
-        console.error("處理事件時發生錯誤:", err);
-        res.status(500).send('內部伺服器錯誤'); // 返回 500 並記錄錯誤
-      });
+  // 遍歷所有事件
+  events.forEach(async (event) => {
+    if (event.type === 'message' && event.message.type === 'text') {
+      const userMessage = event.message.text;
+
+      // 發送回覆訊息
+      try {
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: `你說的是: ${userMessage}`
+        });
+      } catch (err) {
+        console.error('Error replying message:', err);
+      }
+    }
   });
 
-// 處理事件
-function handleEvent(event) {
-  if (event.type === 'message' && event.message.type === 'text') {
-    const echo = { type: 'text', text: event.message.text };
-    return client.replyMessage(event.replyToken, echo);
-  }
-  return Promise.resolve(null);
-}
+  res.status(200).send('OK');
+});
 
 // 啟動伺服器
-const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`Server running on port ${port}`);
 });
