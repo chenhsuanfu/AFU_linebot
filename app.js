@@ -1,72 +1,85 @@
-import { Client } from '@line/bot-sdk';
-import express from 'express';
-import dotenv from 'dotenv';
-import { OpenAI } from 'openai';
+// 引入必要的套件
+require('dotenv').config();  // 載入 .env 檔案中的環境變數
+const express = require('express');
+const line = require('@line/bot-sdk');
+const { OpenAI } = require('openai'); // 使用新的方式引入 OpenAI
 
-// 載入環境變數
-dotenv.config();
-
-// 初始化 LINE Bot 客戶端
-const lineConfig = {
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET,
+// 使用環境變數來讀取敏感資料
+const config = {
+  channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
+  channelSecret: process.env.CHANNEL_SECRET
 };
-const lineClient = new Client(lineConfig);
 
-// 初始化 OpenAI 客戶端
+const app = express();
+const port = process.env.PORT || 3000;
+
+// 初始化 LINE SDK 客戶端
+const client = new line.Client(config);
+
+// 初始化 OpenAI API 客戶端
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,  // 使用 API Key 來初始化 OpenAI 客戶端
 });
 
-// 創建 Express 應用
-const app = express();
-
 // 設定 webhook 路由
-app.post('/webhook', express.json(), async (req, res) => {
+app.post('/webhook', express.json(), (req, res) => {
   const events = req.body.events;
 
-  // 處理每一個事件
-  for (const event of events) {
+  // 遍歷所有事件
+  events.forEach(async (event) => {
     if (event.type === 'message' && event.message.type === 'text') {
-      const userMessage = event.message.text;  // 用戶發送的訊息
-      const replyToken = event.replyToken;    // 用於回覆的 token
+      const userMessage = event.message.text;
 
-      // 呼叫 OpenAI API 生成回應
+      // 發送回覆訊息
       try {
-        const openAIResponse = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',  // 使用 GPT-3.5 模型
-          messages: [
-            { role: 'system', content: '你是個友善的助手。' },  // 系統訊息
-            { role: 'user', content: userMessage },  // 用戶的訊息
-          ],
+        // 呼叫 OpenAI API 生成流式回應
+        const aiResponse = openai.chat.completions.create({
+            model: 'gpt-4o-mini',  // 使用 GPT-3.5 模型
+            messages: [{ role: 'user', content: userMessage }],
+            stream: true,  // 啟用流式回應
+          });
+
+        // 建立一個變數來存儲訊息
+        let botReply = '';
+
+        // 監聽流式回應
+        aiResponse.on('data', (data) => {
+          const message = data.choices[0]?.delta?.content;
+          if (message) {
+            botReply += message;  // 不斷拼接訊息
+          }
         });
 
-        // 獲取回應訊息
-        const botReply = openAIResponse.choices[0].message.content;
-
-        // 回覆 LINE 用戶
-        await lineClient.replyMessage(replyToken, {
-          type: 'text',
-          text: botReply,
+        // 當流式回應完成時，發送最終回覆
+        aiResponse.on('end', async () => {
+          await client.replyMessage(event.replyToken, {
+            type: 'text',
+            text: botReply.trim()  // 發送完整的回覆
+          });
         });
-      } catch (error) {
-        console.error('Error from OpenAI:', error);
 
-        // 發送錯誤訊息給用戶
-        await lineClient.replyMessage(replyToken, {
-          type: 'text',
-          text: '抱歉，出現錯誤，請稍後再試。',
+        aiResponse.on('error', (err) => {
+          console.error('Error with streaming:', err);
+          client.replyMessage(event.replyToken, {
+            type: 'text',
+            text: '抱歉，發生了一些錯誤，請稍後再試。'
+          });
         });
+
+      } catch (err) {
+        console.error('Error replying message:', err);
+        await client.replyMessage(event.replyToken, {
+            type: 'text',
+            text: '抱歉，發生了一些錯誤，請稍後再試。'
+          });
       }
     }
-  }
+  });
 
-  // 回應 LINE 平台的請求
   res.status(200).send('OK');
 });
 
 // 啟動伺服器
-const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`Server running on port ${port}`);
 });
