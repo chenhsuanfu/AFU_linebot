@@ -2,7 +2,6 @@
 require('dotenv').config();  // 載入 .env 檔案中的環境變數
 const express = require('express');
 const line = require('@line/bot-sdk');
-const { OpenAI } = require('openai'); // 使用新的方式引入 OpenAI
 
 // 使用環境變數來讀取敏感資料
 const config = {
@@ -16,11 +15,6 @@ const port = process.env.PORT || 3000;
 // 初始化 LINE SDK 客戶端
 const client = new line.Client(config);
 
-// 初始化 OpenAI API 客戶端
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,  // 使用 API Key 來初始化 OpenAI 客戶端
-});
-
 // 設定 webhook 路由
 app.post('/webhook', express.json(), (req, res) => {
   const events = req.body.events;
@@ -32,24 +26,12 @@ app.post('/webhook', express.json(), (req, res) => {
 
       // 發送回覆訊息
       try {
-        // 呼叫 OpenAI API 生成回應
-        const aiResponse = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',  // 使用 gpt-4o-mini 模型
-            messages: [{ role: 'user', content: userMessage }],
-        });
-
-        const botReply = aiResponse.choices[0].message.content.trim();
-
         await client.replyMessage(event.replyToken, {
           type: 'text',
-          text: botReply
+          text: `你說的是: ${userMessage}`
         });
       } catch (err) {
         console.error('Error replying message:', err);
-        await client.replyMessage(event.replyToken, {
-            type: 'text',
-            text: '抱歉，發生了一些錯誤，請稍後再試。'
-          });
       }
     }
   });
