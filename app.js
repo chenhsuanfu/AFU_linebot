@@ -17,7 +17,9 @@ const port = process.env.PORT || 3000;
 const client = new line.Client(config);
 // 初始化 OpenAI API 客戶端
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY, // 使用 OpenAI 的 API 密鑰
+    organization: process.env.OPENAI_ORG_ID,  // Your OpenAI organization ID
+    project: process.env.OPENAI_PROJECT_ID,  // Your OpenAI project ID
+
   });
 
 
@@ -34,7 +36,7 @@ app.post('/webhook', express.json(), (req, res) => {
       try {
         // 呼叫 OpenAI API 生成回應
         const aiResponse = await openai.chat.completions.create({
-            model: 'gpt-3.5-turbo',  // 使用 GPT-3.5 模型
+            model: 'gpt-4o-mini',  // 使用 GPT-3.5 模型
             messages: [{ role: 'user', content: userMessage }],
           });
   
