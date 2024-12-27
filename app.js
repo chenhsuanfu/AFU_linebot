@@ -18,13 +18,13 @@ app.use(bodyParser.json());
 
 // Webhook 路徑
 app.post('/webhook', line.middleware(config), (req, res) => {
-  Promise.all(req.body.events.map(handleEvent))
-    .then(() => res.status(200).end())
-    .catch(err => {
-      console.error(err);
-      res.status(500).end();
-    });
-});
+    Promise.all(req.body.events.map(handleEvent))
+      .then(() => res.status(200).end()) // 如果處理成功，返回 200
+      .catch(err => {
+        console.error("處理事件時發生錯誤:", err);
+        res.status(500).send('內部伺服器錯誤'); // 返回 500 並記錄錯誤
+      });
+  });
 
 // 處理事件
 function handleEvent(event) {
