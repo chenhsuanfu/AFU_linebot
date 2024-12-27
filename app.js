@@ -32,40 +32,18 @@ app.post('/webhook', express.json(), (req, res) => {
 
       // 發送回覆訊息
       try {
-        // 呼叫 OpenAI API 生成流式回應
-        const aiResponse = openai.chat.completions.create({
-            model: 'gpt-4o-mini',  // 使用 GPT-3.5 模型
+        // 呼叫 OpenAI API 生成回應
+        const aiResponse = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',  // 使用 gpt-4o-mini 模型
             messages: [{ role: 'user', content: userMessage }],
-            stream: true,  // 啟用流式回應
-          });
-
-        // 建立一個變數來存儲訊息
-        let botReply = '';
-
-        // 監聽流式回應
-        aiResponse.on('data', (data) => {
-          const message = data.choices[0]?.delta?.content;
-          if (message) {
-            botReply += message;  // 不斷拼接訊息
-          }
         });
 
-        // 當流式回應完成時，發送最終回覆
-        aiResponse.on('end', async () => {
-          await client.replyMessage(event.replyToken, {
-            type: 'text',
-            text: botReply.trim()  // 發送完整的回覆
-          });
-        });
+        const botReply = aiResponse.choices[0].message.content.trim();
 
-        aiResponse.on('error', (err) => {
-          console.error('Error with streaming:', err);
-          client.replyMessage(event.replyToken, {
-            type: 'text',
-            text: '抱歉，發生了一些錯誤，請稍後再試。'
-          });
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: botReply
         });
-
       } catch (err) {
         console.error('Error replying message:', err);
         await client.replyMessage(event.replyToken, {
